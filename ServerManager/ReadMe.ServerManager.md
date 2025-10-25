@@ -67,7 +67,7 @@ GET http://192.168.1.249:8080/getServer?model=default
   "port": 6000,
   "model": "default",
   "status": "ok"
-}
+}```
 
 ```rest
 GET http://192.168.1.249:8080/status

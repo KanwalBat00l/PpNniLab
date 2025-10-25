@@ -119,3 +119,8 @@ for More information
 - [ServerManager](/ServerManager/ReadMe.ServerManager.md) 
 - [AndroidApp](/AndroidApp/ReadMe.AndroidApp.md) 
 - [PPNNI](/PPNNI.Dummy/ReadMe.PPNNI.md) 
+
+### Sample Runs
+- ![PPNNI (Server and Client)](/img/ppnni.png)
+- ![Server Manager (with PPNNI client only)](/img/servermanager.png)
+- ![Android App (communicating with Server Manager)](/img/androidapp.png)

@@ -1,0 +1,22 @@
+# Kotlin / Gradle
+/.gradle/
+/build/
+/out/
+*.iml
+*.class
+
+# Android Studio
+.idea/
+*.apk
+*.aab
+/local.properties
+/captures/
+
+# C++ binaries
+PPNNI.Dummy/build/
+*.exe
+
+# Misc
+*.log
+*.tmp
+*.DS_Store

@@ -1,0 +1,6 @@
+GET http://192.168.1.249:8080/getServer?model=default
+###
+
+
+GET http://192.168.1.249:8080/status
+###

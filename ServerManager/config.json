@@ -1,0 +1,12 @@
+{
+  "hostIp": "192.168.1.249",
+  "managerPort": 8080,
+  "portPool": [6000, 6001, 6002],
+  "serverLifetimeMs": 120000,
+  "models": {
+    "default": {
+      "model_dir": "../PPNNI.Dummy/build",
+      "model_cmd": "./server"
+    }
+  }
+}

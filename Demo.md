@@ -60,4 +60,9 @@ cd AndroidApp
 -Select the image and perform the secure computation
 
 
-- ![PPNNI (Server and Client)](/media/PPNNI-Demo.mov)
+#### Demo
+
+<video width="640" height="480" controls>
+  <source src="media/PPNNI-Demo.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>

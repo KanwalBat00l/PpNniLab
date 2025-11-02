@@ -125,6 +125,6 @@ for More information
 - **Step 2: Run the Client** Provide the server’s IP, port, and an input image file: `./client 127.0.0.1 6000 test.jpg`
 
 ### Sample Runs
-- ![PPNNI (Server and Client)](/img/ppnni.png)
-- ![Server Manager (with PPNNI client only)](/img/servermanager.png)
-- ![Android App (communicating with Server Manager)](/img/androidapp.png)
+- ![PPNNI (Server and Client)](/media/ppnni.png)
+- ![Server Manager (with PPNNI client only)](/media/servermanager.png)
+- ![Android App (communicating with Server Manager)](/media/androidapp.png)

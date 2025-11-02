@@ -13,7 +13,7 @@
 /captures/
 
 # C++ binaries
-PPNNI.Dummy/build/
+#PPNNI.Dummy/build/
 *.exe
 
 # Misc

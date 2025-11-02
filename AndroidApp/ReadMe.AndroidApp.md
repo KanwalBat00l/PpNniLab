@@ -38,7 +38,13 @@ A lightweight Android application that connects to a backend server to perform *
 ## 🧩 How to Use
 
 1. Run your backend (kotlin/ktor/C++ server) accessible via http request
-2. Build and install the Android app.
+2. Build and install the Android app. 
+
+```bash 
+./gradlew clean
+./gradlew assembleDebug
+```
+
 3. Enter the Server URL (e.g., http://192.168.1.249:8080) and optional model name.
 4. Connect to Server.
 5. Select an image to start secure inference.

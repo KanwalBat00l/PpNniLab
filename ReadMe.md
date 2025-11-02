@@ -120,6 +120,10 @@ for More information
 - [AndroidApp](/AndroidApp/ReadMe.AndroidApp.md) 
 - [PPNNI](/PPNNI.Dummy/ReadMe.PPNNI.md) 
 
+### Testing PPNNI Client and Server
+- **Step 1: Start the Server** on some port `./server 6000`
+- **Step 2: Run the Client** Provide the server’s IP, port, and an input image file: `./client 127.0.0.1 6000 test.jpg`
+
 ### Sample Runs
 - ![PPNNI (Server and Client)](/img/ppnni.png)
 - ![Server Manager (with PPNNI client only)](/img/servermanager.png)

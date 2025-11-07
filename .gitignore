@@ -15,7 +15,7 @@
 # C++ binaries
 #PPNNI.Dummy/build/
 *.exe
-PPNNI.Dummy/
+/PPNNI.Dummy/
 build/
 
 # Misc

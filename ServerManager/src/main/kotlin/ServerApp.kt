@@ -13,13 +13,12 @@ import io.ktor.serialization.jackson.*
 import io.ktor.server.application.*
 import java.io.File
 
-/** Application entry point */
 fun main() {
     val mapper = ObjectMapper().registerKotlinModule()
     val configFile = File("config.json")
 
     val config: Config = if (configFile.exists()) {
-        try { mapper.readValue(configFile) } 
+        try { mapper.readValue(configFile) }
         catch (e: Exception) {
             println("❌ Failed to parse config.json: ${e.message}")
             Config()

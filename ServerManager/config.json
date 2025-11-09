@@ -1,12 +1,24 @@
 {
   "hostIp": "192.168.1.249",
   "managerPort": 8080,
-  "portPool": [6000, 6001, 6002],
+  "portRange": [6000, 6100],
   "serverLifetimeMs": 120000,
   "models": {
-    "default": {
-      "model_dir": "../PPNNI.Dummy/build",
-      "model_cmd": "./server"
+    "resnet50": {
+      "model_dir": "../PPNNI.Mock",
+      "model_cmd": "scripts/run-server.sh"
+    },
+    "resnet50_quantized": {
+      "model_dir": "../PPNNI.Mock",
+      "model_cmd": "scripts/run-server.sh"
+    },
+    "sqnet": {
+      "model_dir": "../PPNNI.Mock",
+      "model_cmd": "scripts/run-server.sh"
+    },
+    "sqnet_quantized": {
+      "model_dir": "../PPNNI.Mock",
+      "model_cmd": "scripts/run-server.sh"
     }
   }
 }

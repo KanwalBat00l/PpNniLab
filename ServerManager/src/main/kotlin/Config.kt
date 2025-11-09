@@ -10,7 +10,7 @@ data class ModelConfig(
 data class Config(
     val hostIp: String = "127.0.0.1",
     val managerPort: Int = 8080,
-    val portPool: List<Int> = listOf(6000, 6001, 6002),
+    val portRange: List<Int> = listOf(6000, 6100),
     val serverLifetimeMs: Long = 300_000,
     val models: Map<String, ModelConfig> = emptyMap()
 )

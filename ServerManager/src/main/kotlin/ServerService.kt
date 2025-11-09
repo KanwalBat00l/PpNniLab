@@ -4,52 +4,73 @@ import com.example.server.config.Config
 import com.example.server.config.ModelConfig
 import kotlinx.coroutines.*
 import java.io.File
+import java.net.ServerSocket
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.random.Random
 
-/** Handles business logic: process management and model allocation */
 class ServerService(private val config: Config) {
 
     private val active = ConcurrentHashMap<Int, Process>()
     private val startTime = ConcurrentHashMap<Int, Instant>()
     private val modelByPort = ConcurrentHashMap<Int, String>()
+    private val protocolByPort = ConcurrentHashMap<Int, String>()
 
-    /** Spawns a model server as a subprocess */
-    private fun spawnServer(port: Int, model: String): Process {
-        val modelCfg: ModelConfig = config.models[model] ?: config.models["default"]
-            ?: throw IllegalStateException("❌ No configuration for model '$model'")
+    private val portPool: List<Int> by lazy {
+        val start = config.portRange[0]
+        val end = config.portRange[1]
+        (start..end).toList()
+    }
 
+    /** Spawns a server using bash script with protocol, model, and port */
+    private fun spawnServer(port: Int, model: String, protocol: String): Process {
+        val modelCfg: ModelConfig = config.models[model]
+            ?: throw IllegalStateException("No configuration for model '$model'")
         val modelDir = File(modelCfg.model_dir)
         require(modelDir.exists()) { "Model directory not found: ${modelDir.absolutePath}" }
 
-        println("▶️ Launching ${modelCfg.model_cmd} in ${modelCfg.model_dir} on port $port")
+        println("▶️ Launching ${modelCfg.model_cmd} for $protocol $model on port $port")
 
-        return ProcessBuilder(modelCfg.model_cmd, port.toString())
+        // Example: bash scripts/run-server.sh cheetah resnet50 6000
+        return ProcessBuilder(modelCfg.model_cmd, protocol, model, port.toString())
             .directory(modelDir)
             .redirectErrorStream(true)
             .start()
     }
 
-    /** Allocates a free port and starts a model server */
-    fun startServer(model: String): Map<String, Any> {
-        val freePort = config.portPool.firstOrNull { !active.containsKey(it) }
-            ?: throw IllegalStateException("No free port available")
+    /** Checks if a port is available at the OS level */
+    private fun isPortAvailable(port: Int): Boolean {
+        return try {
+            ServerSocket(port).close()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
 
-        val proc = spawnServer(freePort, model)
+    /** Allocates a random free port and starts a server */
+    fun startServer(model: String, protocol: String = "cheetah"): Map<String, Any> {
+        val shuffledPorts = portPool.shuffled(Random(System.currentTimeMillis()))
+        val freePort = shuffledPorts.firstOrNull { 
+            !active.containsKey(it) && isPortAvailable(it) 
+        } ?: throw IllegalStateException("No free port available")
+
+        val proc = spawnServer(freePort, model, protocol)
         active[freePort] = proc
         startTime[freePort] = Instant.now()
         modelByPort[freePort] = model
+        protocolByPort[freePort] = protocol
 
         val scope = CoroutineScope(Dispatchers.IO)
 
-        // Capture logs asynchronously
+        // Capture server logs asynchronously
         scope.launch {
-            proc.inputStream.bufferedReader().forEachLine {
-                println("[server:$freePort][$model] $it")
+            proc.inputStream.bufferedReader().forEachLine { line ->
+                println("[server:$freePort][$model][$protocol] $line")
             }
         }
 
-        // Manage lifetime
+        // Monitor server lifetime asynchronously
         scope.launch {
             val finished = proc.waitFor(config.serverLifetimeMs, java.util.concurrent.TimeUnit.MILLISECONDS)
             if (!finished) {
@@ -65,25 +86,28 @@ class ServerService(private val config: Config) {
             "ip" to config.hostIp,
             "port" to freePort,
             "model" to model,
+            "protocol" to protocol,
             "status" to "ok"
         )
     }
 
-    /** Returns server statuses */
+    /** Returns statuses of currently running servers only */
     fun getStatus(): List<Map<String, Any?>> =
-        config.portPool.map {
+        active.keys.map { port ->
             mapOf(
-                "port" to it,
-                "running" to active.containsKey(it),
-                "model" to modelByPort[it],
-                "startedAt" to startTime[it]?.toString()
+                "port" to port,
+                "running" to true,
+                "model" to modelByPort[port],
+                "protocol" to protocolByPort[port],
+                "startedAt" to startTime[port]?.toString()
             )
         }
 
-    /** Cleans up when a process exits */
+    /** Cleanup after process exit */
     private fun cleanup(port: Int) {
         active.remove(port)
         startTime.remove(port)
         modelByPort.remove(port)
+        protocolByPort.remove(port)
     }
 }

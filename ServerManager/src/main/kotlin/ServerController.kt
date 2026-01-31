@@ -16,7 +16,7 @@ fun Application.serverRoutes(service: ServerService) {
                 val info = service.startServer(model, protocol)
                 call.respond(info)
             } catch (e: Exception) {
-                call.respond(HttpStatusCode.InternalServerError, mapOf("error" to e.message))
+                call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (e.message ?: "Unknown error")))
             }
         }
 

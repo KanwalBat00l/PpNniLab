@@ -10,7 +10,10 @@ data class ModelConfig(
 data class Config(
     val hostIp: String = "127.0.0.1",
     val managerPort: Int = 8080,
-    val portRange: List<Int> = listOf(6000, 6100),
-    val serverLifetimeMs: Long = 300_000,
+    val portRange: List<Int> = listOf(9000, 9200),
+    val serverLifetimeMs: Long = 120000,
     val models: Map<String, ModelConfig> = emptyMap()
-)
+) {
+    val baseUrl: String 
+        get() = "http://$hostIp:$managerPort"
+}

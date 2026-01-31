@@ -1,0 +1,6 @@
+=   [CHECK] Sending unapproved protocol: 'malicious_protocol'
+L   [ASSERT] Caught expected exception: Invalid protocol: malicious_protocol
+)   [INPUT] Host IP: 10.0.0.1, Port: 7000
+4   [ASSERT] Generated BaseURL: http://10.0.0.1:7000
+D   [CHECK] Inspecting server registry before any client requests...
+    [ASSERT] Registry size is: 0

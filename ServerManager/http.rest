@@ -1,16 +1,28 @@
-GET http://192.168.1.249:8080/getServer?model=default
-###
+### 🌐 PPNNI SERVER MANAGER - INTEGRATION TEST SUITE
+@host = http://10.168.212.227:8080
 
-# HTTP GET request to start server
-GET http://192.168.1.249:8080/getServer?model=resnet50&protocol=cheetah
-###
+### [POSITIVE] 1. Get Server for ResNet50 (Cheetah)
+GET {{host}}/getServer?model=resnet50&protocol=cheetah
+Accept: application/json
 
-# Check status
-GET http://localhost:8080/status
-###
+### [POSITIVE] 2. Get Server for SqNet (Quantized + SCI_HE)
+GET {{host}}/getServer?model=sqnet_quantized&protocol=SCI_HE
+Accept: application/json
 
+### [POSITIVE] 3. Check System Status (Should show active servers)
+GET {{host}}/status
+Accept: application/json
 
-http://localhost:8080/swagger/index.html
-###
+### [NEGATIVE] 4. Invalid Protocol Error (Should return 500)
+GET {{host}}/getServer?model=resnet50&protocol=invalid_proto
+Accept: application/json
 
+### [NEGATIVE] 5. Invalid Model Error (Should return 500)
+GET {{host}}/getServer?model=unknown_model&protocol=cheetah
+Accept: application/json
 
+### [DOCUMENTATION] 6. Access Swagger UI
+GET {{host}}/index.html
+
+### [DOCUMENTATION] 7. Fetch OpenAPI Specification
+GET {{host}}/openapi.json

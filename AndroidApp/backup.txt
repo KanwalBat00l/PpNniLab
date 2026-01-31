@@ -1,0 +1,354 @@
+package com.example.androidapp
+
+import android.net.Uri
+import android.os.Bundle
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ImageView
+import android.widget.ScrollView
+import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import android.graphics.BitmapFactory
+import android.text.method.ScrollingMovementMethod
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.graphics.Color
+
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var clientManager: ClientManager
+    private lateinit var outputText: TextView
+    private lateinit var scrollView: ScrollView
+    private lateinit var ivPreview: ImageView
+    private var currentServer: ServerResponse? = null
+
+    private val imagePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { displayAndRunClient(it) }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        clientManager = ClientManager(this)
+        outputText = findViewById(R.id.tvResult)
+        scrollView = findViewById(R.id.scrollOutput)
+        ivPreview = findViewById(R.id.ivPreview)
+
+        val requestBtn = findViewById<Button>(R.id.btnConnectServer)
+        val selectBtn = findViewById<Button>(R.id.btnSelectImage)
+
+        val etServerUrl = findViewById<EditText>(R.id.etServerUrl)
+        val etModel = findViewById<EditText>(R.id.etModel)
+
+        outputText.movementMethod = ScrollingMovementMethod()
+
+        // Connect to server
+        requestBtn.setOnClickListener {
+            lifecycleScope.launch {
+                val baseUrl = etServerUrl.text.toString().ifBlank { "http:10.0.2.2:8080" }
+                val modelName = etModel.text.toString().ifBlank { "default" }
+                restLog()
+                appendLog("info", "Requesting server...")
+
+                val result = clientManager.requestServer(baseUrl, modelName)
+                result.onSuccess {
+                    currentServer = it
+                    appendLog("success", "Connected to ${it.ip}:${it.port} (model: $modelName)")
+                    selectBtn.isEnabled = true
+                }.onFailure {
+                    appendLog("error", "Connection failed: ${it.message}")
+                }
+            }
+        }
+
+
+        // Browse image
+        selectBtn.setOnClickListener {
+            imagePicker.launch("image/*")
+        }
+    }
+
+    private fun displayAndRunClient(uri: Uri) {
+        // Display image
+        contentResolver.openInputStream(uri)?.use { stream ->
+            val bitmap = BitmapFactory.decodeStream(stream)
+            ivPreview.setImageBitmap(bitmap)
+        }
+
+        // Run client
+        val server = currentServer ?: return
+        appendLog("info", "Running client...")
+        lifecycleScope.launch {
+            val result = clientManager.runNativeClient(server.ip, server.port, uri)
+            result.onSuccess {
+                appendLog("success", "Output:\n$it")
+            }.onFailure {
+                appendLog("error", "Failed:\n${it.message}")
+            }
+        }
+    }
+    private fun restLog(){
+        outputText.text=""
+    }
+    // Append logs with optional color and auto-scroll
+    private fun appendLog(type: String, message: String) {
+        val color = when (type) {
+            "success" -> Color.parseColor("#008000") // green
+            "error" -> Color.parseColor("#FF0000")   // red
+            else -> Color.parseColor("#333333")      // gray/info
+        }
+
+        val spannable = SpannableStringBuilder()
+        spannable.append(outputText.text)
+        if (spannable.isNotEmpty()) spannable.append("\n")
+        val start = spannable.length
+        spannable.append(message)
+        spannable.setSpan(ForegroundColorSpan(color), start, spannable.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        outputText.text = spannable
+
+        // Auto-scroll to bottom
+        scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+    }
+}
+//ClientManager.kt here
+package com.example.androidapp
+
+import android.content.Context
+import android.net.Uri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import java.io.File
+
+data class ServerResponse(val ip: String, val port: Int, val model: String, val status: String)
+
+class ClientManager(private val context: Context) {
+
+    private val client = OkHttpClient()
+    /** Requests server info from backend */
+    suspend fun requestServer(baseUrl:String="http://10.0.2.2:8080", model: String = "default"): Result<ServerResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                val request = Request.Builder()
+                    .url("$baseUrl/getServer?model=$model")
+                    .build()
+
+                val response = client.newCall(request).execute()
+                if (!response.isSuccessful) {
+                    return@withContext Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+                }
+
+                val body = response.body?.string()
+                val json = JSONObject(body ?: "{}")
+
+                Result.success(
+                    ServerResponse(
+                        ip = json.getString("ip"),
+                        port = json.getInt("port"),
+                        model = json.getString("model"),
+                        status = "ok"
+                    )
+                )
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    /** Runs the native client binary with the given IP, port, and image */
+    suspend fun runNativeClient(ip: String, port: Int, imageUri: Uri): Result<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                // Copy selected image to app cache
+                val file = File(context.cacheDir, "selected_image.jpg")
+                context.contentResolver.openInputStream(imageUri)?.use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
+
+                // Correct JNI call
+                val output = NativeBridge.execute(ip, port, file)
+
+                Result.success(output)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+}
+//NativeBridge backup here
+package com.example.androidapp
+
+import java.io.File
+
+object NativeBridge {
+    init {
+        System.loadLibrary("client_jni")  // only load your JNI wrapper
+    }
+
+    // JNI expects only: ip (String), port (Int), imagePath (String)
+    external fun runClient(ip: String, port: Int, imagePath: String): String
+
+    /** Helper to call JNI with a File */
+    fun execute(ip: String, port: Int, file: File): String {
+        return runClient(ip, port, file.absolutePath)
+    }
+}
+
+
+// ServerManager code backup here
+
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import com.fasterxml.jackson.module.kotlin.readValue
+import kotlinx.coroutines.*
+import io.ktor.server.engine.embeddedServer
+import io.ktor.server.netty.Netty
+import io.ktor.server.application.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.http.*
+import java.io.File
+import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
+
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.serialization.jackson.*
+
+
+// ----- Configuration data classes -----
+data class ModelConfig(
+    val model_dir: String,
+    val model_cmd: String
+)
+
+data class Config(
+    val hostIp: String = "127.0.0.1",
+    val managerPort: Int = 8080,
+    val portPool: List<Int> = listOf(6000, 6001, 6002),
+    val serverLifetimeMs: Long = 300_000,
+    val models: Map<String, ModelConfig> = emptyMap()
+)
+
+// ----- Main Entrypoint -----
+fun main() {
+    val mapper = ObjectMapper().registerKotlinModule()
+    val configFile = File("config.json")
+
+    val config: Config = if (configFile.exists()) {
+        try {
+            mapper.readValue(configFile)
+        } catch (e: Exception) {
+            println("❌ Failed to parse config.json: ${e.message}")
+            Config()
+        }
+    } else {
+        println("⚠️ config.json not found — using defaults.")
+        Config()
+    }
+
+    println("🚀 Server Manager starting with config: $config")
+
+    val active = ConcurrentHashMap<Int, Process>()
+    val startTime = ConcurrentHashMap<Int, Instant>()
+    val modelByPort = ConcurrentHashMap<Int, String>()
+
+    // ----- Launch a model server -----
+    fun spawnServer(port: Int, model: String): Process {
+        val modelCfg = config.models[model] ?: config.models["default"]
+            ?: throw IllegalStateException("❌ No configuration for model '$model'")
+
+        val modelDir = File(modelCfg.model_dir)
+        val modelCmd = modelCfg.model_cmd
+
+        require(modelDir.exists()) { "❌ Model directory not found: ${modelDir.absolutePath}" }
+
+        println("▶️ Launching ${modelCfg.model_cmd} in ${modelCfg.model_dir} on port $port")
+
+        return ProcessBuilder(modelCmd, port.toString())
+            .directory(modelDir)
+            .redirectErrorStream(true)
+            .start()
+    }
+
+    // ----- Ktor HTTP server -----
+    embeddedServer(Netty, port = config.managerPort) {
+        install(ContentNegotiation) {
+            jackson()
+        }       
+
+        routing {
+            // Allocate a port and start a model server
+            get("/getServer") {
+                val model = call.request.queryParameters["model"] ?: "default"
+                val freePort = config.portPool.firstOrNull { !active.containsKey(it) }
+
+                if (freePort == null) {
+                    call.respond(HttpStatusCode.ServiceUnavailable, "No free port available")
+                    return@get
+                }
+
+                try {
+                    val proc = spawnServer(freePort, model)
+                    active[freePort] = proc
+                    startTime[freePort] = Instant.now()
+                    modelByPort[freePort] = model
+
+                    // Capture and print process logs asynchronously
+                    val scope = CoroutineScope(Dispatchers.IO)
+                    scope.launch {
+                        proc.inputStream.bufferedReader().forEachLine {
+                            println("[server:$freePort][$model] $it")
+                        }
+                    }
+
+                    // Lifetime manager
+                    scope.launch {
+                        val finished = proc.waitFor(config.serverLifetimeMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                        if (!finished) {
+                            println("[manager] server on $freePort timed out; killing.")
+                            proc.destroyForcibly()
+                        } else {
+                            println("[manager] server on $freePort exited with code ${proc.exitValue()}")
+                        }
+                        active.remove(freePort)
+                        modelByPort.remove(freePort)
+                        startTime.remove(freePort)
+                    }
+
+                    
+                    val jsonResponse = mapper.writeValueAsString(
+                        mapOf(
+                            "ip" to config.hostIp,
+                            "port" to freePort,
+                            "model" to model,
+                            "status" to "ok"
+                        )
+                    )
+                    call.respondText(jsonResponse, ContentType.Application.Json, HttpStatusCode.OK)
+
+                    
+                } catch (ex: Exception) {
+                    call.respond(HttpStatusCode.InternalServerError, "Failed: ${ex.message}")
+                }
+            }
+
+            // Status endpoint
+            get("/status") {
+                call.respond(config.portPool.map {
+                    mapOf(
+                        "port" to it,
+                        "running" to active.containsKey(it),
+                        "model" to modelByPort[it],
+                        "startedAt" to startTime[it]?.toString()
+                    )
+                })
+            }
+        }
+    }.start(wait = true)
+}

@@ -1,6 +1,6 @@
 ### 🌐 PPNNI SERVER MANAGER - INTEGRATION TEST SUITE
-@host = http://10.168.212.227:8080
-
+###@host = http://10.168.212.227:8080
+@host = http://localhost:8080
 ### [POSITIVE] 1. Get Server for ResNet50 (Cheetah)
 GET {{host}}/getServer?model=resnet50&protocol=cheetah
 Accept: application/json

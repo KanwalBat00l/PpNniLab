@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="ServerServiceTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-31T22:09:42.483Z" hostname="Mac.home" time="0.012">
+<testsuite name="ServerServiceTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-02-01T10:31:03.368Z" hostname="Mac.home" time="0.035">
   <properties/>
-  <testcase name="&#x1f9ea; UT_Server_01: Security Validation - Protocol Whitelist" classname="ServerServiceTest" time="0.008"/>
-  <testcase name="&#x1f9ea; UT_Server_03: Dynamic Configuration - URL Generation" classname="ServerServiceTest" time="0.002"/>
-  <testcase name="&#x1f9ea; UT_Server_02: Orchestrator State - Initial Registry" classname="ServerServiceTest" time="0.001"/>
-  <system-out><![CDATA[   [CHECK] Sending unapproved protocol: 'malicious_protocol'
-   [ASSERT] Caught expected exception: Invalid protocol: malicious_protocol
-   [INPUT] Host IP: 10.0.0.1, Port: 7000
-   [ASSERT] Generated BaseURL: http://10.0.0.1:7000
-   [CHECK] Inspecting server registry before any client requests...
-   [ASSERT] Registry size is: 0
+  <testcase name="&#x1f9ea; UT_Server_02: Atomic Port Exhaustion" classname="ServerServiceTest" time="0.028"/>
+  <testcase name="&#x1f9ea; UT_Server_01: Input Sanitization" classname="ServerServiceTest" time="0.0"/>
+  <testcase name="&#x1f9ea; UT_Server_03: Metadata &amp; Uptime Tracking" classname="ServerServiceTest" time="0.003"/>
+  <testcase name="&#x1f9ea; UT_Server_04: Environment Portability" classname="ServerServiceTest" time="0.002"/>
+  <system-out><![CDATA[>>> Filling port range to test overflow protection...
+>>> Caught Expected Error: RESOURCE_EXHAUSTED: No free ports in range [9900, 9901]
+>>> Testing validation of protocol strings...
+>>> Verifying instance tracking logic...
+>>> Verifying dynamic URL construction...
 ]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

@@ -11,6 +11,7 @@ This application demonstrates the system's ability to perform high-latency, mult
 The application uses a **Layered Architecture** to bridge the high-level Kotlin UI with the low-level C++ protocol engine.
 
 <pre>
+
 AndroidApp/app/src/
 ├── main/
 │   ├── java/com/example/androidapp/
@@ -26,7 +27,7 @@ AndroidApp/app/src/
 └── androidTest/
     └── java/com/example/androidapp/
         └── AndroidAppTest.kt        # Automated Instrumentation Test Suite
-        
+     
 </pre>
 
 ## 🚀 Features
@@ -40,16 +41,16 @@ AndroidApp/app/src/
 
 
 ## ⚙️ Components
-
+<pre>
 | File                   | Responsibility                                                                        |
 |------------------------|---------------------------------------------- ----------------------------------------|
-| `MainActivity.kt`      | Orchestrates user input, image selection, and UI log updates.                          |
+| `MainActivity.kt`      | Orchestrates user input, image selection, and UI log updates.                         |
 | `ClientManager.kt`     | Handles the handoff from HTTP (discovery) to TCP (secure socket).                     |
 | `NativeBridge.kt`      | JNI wrapper for C++ Wrapper                                                           |
 | `ImagePreprocessor.kt` | Normalizes images (Mean/StdDev) and quantizes to 12-bit fixed-point.                  |
 | `client_jni.cpp`       | A lean bridge that invokes the verified client_run function from the C++ Mock.        |
 | `CMakeLists.txt`       | Statically links the external PPNNI.Mock/mock_client.cpp source for binary stability. |
-
+</pre>
 
 ## 🧩 How to Use
 

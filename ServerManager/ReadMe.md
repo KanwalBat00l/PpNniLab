@@ -65,6 +65,7 @@ Create a `config.json` file in the same directory:
 ```bash
 ./gradlew build
 ./gradlew run
+./gradlew cleanTest test
 ```
 
 Server will start at:

@@ -58,7 +58,7 @@ AndroidApp/app/src/
 2. Build and install the Android app. 
 
 ```bash 
- ./gradlew clean
+./gradlew clean
 ./gradlew assembleDebug
 ./gradlew connectedAndroidTest
 ```

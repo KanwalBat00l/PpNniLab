@@ -43,7 +43,7 @@ AndroidApp/app/src/
 
 | File                   | Responsibility                                                                        |
 |------------------------|---------------------------------------------- ----------------------------------------|
-| `MainActivity.kt`      | rchestrates user input, image selection, and UI log updates.                          |
+| `MainActivity.kt`      | Orchestrates user input, image selection, and UI log updates.                          |
 | `ClientManager.kt`     | Handles the handoff from HTTP (discovery) to TCP (secure socket).                     |
 | `NativeBridge.kt`      | JNI wrapper for C++ Wrapper                                                           |
 | `ImagePreprocessor.kt` | Normalizes images (Mean/StdDev) and quantizes to 12-bit fixed-point.                  |
@@ -56,10 +56,13 @@ AndroidApp/app/src/
 1. Run your backend (kotlin/ktor/C++ server) accessible via http request
 2. Build and install the Android app. 
 
-```bash 
-./gradlew clean
+> ```bash 
+ ./gradlew clean
 ./gradlew assembleDebug
+./gradlew connectedAndroidTest
 ```
+
+
 
 3. Enter the Server URL (e.g., http://192.168.1.249:8080) and select model and protocol.
 4. Connect to Server.

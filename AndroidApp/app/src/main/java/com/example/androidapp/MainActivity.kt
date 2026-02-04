@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import java.io.File
+import java.net.URI
 
 class MainActivity : AppCompatActivity() {
 
@@ -26,19 +27,14 @@ class MainActivity : AppCompatActivity() {
 
     private var currentServer: ServerResponse? = null
 
-    // --- Image picker ---
     private val imagePicker =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             uri?.let { imageUri ->
-                // 1. Process image and create mock .inp file in the "pretrained" workspace
-                MockImageInputManager.processImage(
-                    context = this,
-                    imageUri = imageUri,
-                    model = spModel.selectedItem.toString(),
-                    protocol = spProtocol.selectedItem.toString()
-                ) { file ->
-                    appendLog("success", "✅ Image processed: ${file.name}")
-                    // 2. Run the native client now that input is ready
+                val model = spModel.selectedItem.toString()
+                val protocol = spProtocol.selectedItem.toString()
+
+                MockImageInputManager.processImage(this, imageUri, model, protocol) { file ->
+                    appendLog("success", "✅ Preprocessing complete: ${file.name}")
                     runMockClientAfterInputReady()
                 }
             }
@@ -47,86 +43,87 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Ensure workspace directory exists for C++ I/O
-        File(filesDir, "pretrained").mkdirs()
+        try {
+            // Ensure workspace directory exists
+            File(filesDir, "pretrained").mkdirs()
 
-        setContentView(R.layout.activity_main)
+            setContentView(R.layout.activity_main)
 
-        // Initialize Views
-        clientManager = ClientManager(this)
-        outputText = findViewById(R.id.tvResult)
-        scrollView = findViewById(R.id.scrollOutput)
-        spModel = findViewById(R.id.spModel)
-        spProtocol = findViewById(R.id.spProtocol)
-        etServerUrl = findViewById(R.id.etServerUrl)
-        btnConnectServer = findViewById(R.id.btnConnectServer)
-        btnRunClient = findViewById(R.id.btnSelectImage)
+            clientManager = ClientManager(this)
+            outputText = findViewById(R.id.tvResult)
+            scrollView = findViewById(R.id.scrollOutput)
+            spModel = findViewById(R.id.spModel)
+            spProtocol = findViewById(R.id.spProtocol)
+            etServerUrl = findViewById(R.id.etServerUrl)
+            btnConnectServer = findViewById(R.id.btnConnectServer)
+            btnRunClient = findViewById(R.id.btnSelectImage)
 
-        outputText.movementMethod = ScrollingMovementMethod()
-        btnRunClient.isEnabled = false
-        btnRunClient.alpha = 0.4f
+            outputText.movementMethod = ScrollingMovementMethod()
 
-        // --- Connect to Server Manager ---
-        btnConnectServer.setOnClickListener {
-            lifecycleScope.launch {
-                resetLog()
-                val baseUrl = etServerUrl.text.toString().ifBlank { "http://10.0.2.2:8080" }
-                val model = spModel.selectedItem.toString()
-                val protocol = spProtocol.selectedItem.toString()
+            // Connect Button Logic
+            btnConnectServer.setOnClickListener {
+                lifecycleScope.launch {
+                    resetLog()
+                    val baseUrl = etServerUrl.text.toString().ifBlank { "http://10.0.2.2:8080" }
+                    appendLog("info", "🛰️ Querying Manager: $baseUrl")
 
-                appendLog("info", "🛰️ Requesting server from Manager...")
-
-                val result = clientManager.requestServer(baseUrl, model, protocol)
-                result.onSuccess {
-                    currentServer = it
-                    appendLog("success", "✅ Server Ready: ${it.ip}:${it.port}")
-                    btnRunClient.isEnabled = true
-                    btnRunClient.alpha = 1f
-                }.onFailure {
-                    appendLog("error", "❌ Connection failed: ${it.message}")
-                    btnRunClient.isEnabled = false
-                    btnRunClient.alpha = 0.4f
+                    clientManager.requestServer(baseUrl, spModel.selectedItem.toString(), spProtocol.selectedItem.toString())
+                        .onSuccess {
+                            currentServer = it
+                            appendLog("success", "✅ Reserved Port: ${it.port}")
+                            btnRunClient.isEnabled = true
+                            btnRunClient.alpha = 1f
+                        }.onFailure {
+                            appendLog("error", "❌ Manager Error: ${it.message}")
+                        }
                 }
             }
-        }
 
-        // --- Run Mock Client ---
-        btnRunClient.setOnClickListener {
-            imagePicker.launch("image/*")
+            btnRunClient.setOnClickListener {
+                imagePicker.launch("image/*")
+            }
+
+        } catch (e: Exception) {
+            // Fallback if layout fails (prevents black screen)
+            val tv = TextView(this)
+            tv.text = "Fatal Init Error: ${e.message}"
+            setContentView(tv)
         }
     }
 
     private fun runMockClientAfterInputReady() {
-        val server = currentServer ?: run {
-            appendLog("error", "❌ No server connected")
-            return
-        }
+        val server = currentServer ?: return
+
+        // Extract IP from the input field to ensure we route correctly to the Mac
+        val userUrl = etServerUrl.text.toString().ifBlank { "http://10.0.2.2:8080" }
+        val targetHost = try { URI(userUrl).host ?: "10.0.2.2" } catch (e: Exception) { "10.0.2.2" }
 
         val model = spModel.selectedItem.toString()
-        val protocol = spProtocol.selectedItem.toString()
+        val proto = spProtocol.selectedItem.toString()
 
-        appendLog("info", "🚀 Running Secure Inference...")
+        appendLog("info", "🚀 Connecting to $targetHost:${server.port}...")
 
         lifecycleScope.launch {
-            // Using ClientManager wrapper which now handles the filesDir correctly
-            val output = clientManager.runMockClient(protocol, model, server.ip, server.port)
-            appendLog("success", output)
+            try {
+                val output = clientManager.runMockClient(proto, model, targetHost, server.port)
+                appendLog("success", "--- NATIVE OUTPUT ---\n$output")
 
-            val predicted = clientManager.parseClientOutput(output)
-            appendLog("info", "📊 $predicted")
+                val prediction = clientManager.parseClientOutput(output)
+                appendLog("info", "📊 $prediction")
+            } catch (e: Exception) {
+                appendLog("error", "❌ JNI Execution Error: ${e.message}")
+            }
         }
     }
-    // --- Logging Helpers ---
-    private fun resetLog() {
-        outputText.text = ""
-    }
+
+    private fun resetLog() { outputText.text = "" }
 
     private fun appendLog(type: String, message: String) {
         val color = when (type) {
-            "success" -> 0xFF008000.toInt() // Green
-            "error" -> 0xFFFF0000.toInt()   // Red
-            "info" -> 0xFF0000FF.toInt()    // Blue
-            else -> 0xFF333333.toInt()      // Dark Gray
+            "success" -> 0xFF008000.toInt()
+            "error" -> 0xFFFF0000.toInt()
+            "info" -> 0xFF0000FF.toInt()
+            else -> 0xFF333333.toInt()
         }
         val spannable = SpannableStringBuilder(outputText.text)
         if (spannable.isNotEmpty()) spannable.append("\n")

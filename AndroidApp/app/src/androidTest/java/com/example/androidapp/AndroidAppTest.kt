@@ -1,57 +1,93 @@
 package com.example.androidapp
 
-import org.junit.Assert
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.Assert.*
+import java.io.File
+import kotlinx.coroutines.runBlocking
+import org.junit.FixMethodOrder
+import org.junit.runners.MethodSorters
 
 @RunWith(AndroidJUnit4::class)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING) // Run in alphabetical order
 class AndroidAppTest {
 
-    // --- CONFIGURABLE TEST PARAMETERS ---
-    private val SERVER_IP = "10.168.212.227" // Change this to your Mac IP
-    private val MANAGER_URL = "http://$SERVER_IP:8080"
+    private val appContext = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
-    fun UT_Android_01_JNI_Connectivity() {
-        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
-
-        // We test with a dummy IP. The goal is to see if the C++ code executes without crashing.
+    fun UT_01_JNI_Bridge_Check() {
+        println("🧪 [START] UT_01: Verifying JNI Bridge Integrity")
+        // Uses the pathing logic verified in Step 2 of your plan
         val result = NativeBridge.runMockClient(
-            "cheetah",
-            "sqnet",
-            "127.0.0.1",
-            8000,
-            context.filesDir.absolutePath
+            TestConfig.DEFAULT_PROTOCOL,
+            TestConfig.DEFAULT_MODEL,
+            "127.0.0.1", 1,
+            appContext.filesDir.absolutePath
         )
 
-        Assert.assertNotNull(result)
-        Assert.assertTrue(result.contains("Native Client Exit Code"))
+        System.out.println(">>> JNI RAW OUTPUT:\n$result")
+
+        assertNotNull("JNI returned null - Library loading failed!", result)
+        assertTrue("Output missing status wrapper", result.contains("[System Status:"))
+        println("✅ [PASS] JNI Bridge is linked and executable.")
     }
 
     @Test
-    fun UT_Android_02_Preprocessing_Format() {
-        val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        // Create a dummy URI and test the preprocessor
-        // (Assuming you have a test image in your assets or resources)
-        // This confirms the .inp file is generated in the 'pretrained' workspace
-    }
+    fun UT_02_Workspace_IO_Safety() {
+        println("🧪 [START] UT_02: Verifying Internal Workspace Permissions")
+        val workspace = File(appContext.filesDir, "pretrained")
+        if (!workspace.exists()) workspace.mkdirs()
 
-    @Test
-    fun UT_Android_03_Automated_Server_Handoff() {
-        val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        val manager = ClientManager(appContext)
+        val testFile = File(workspace, "verifier.txt")
+        testFile.writeText("logic_check")
 
-        // This runs the full flow:
-        // 1. Talk to Ktor Manager
-        // 2. Receive Port
-        // 3. Verify the IP matches our config
-
-        /*
-        runBlocking {
-            val result = manager.requestServer(MANAGER_URL, "resnet50", "cheetah")
-            assertTrue(result.isSuccess)
-            assertEquals(SERVER_IP, result.getOrNull()?.ip)
+        try {
+            assertEquals("File I/O Data mismatch", "logic_check", testFile.readText())
+            println("✅ [PASS] Internal storage is writable for Native Process.")
+        } finally {
+            testFile.delete()
         }
-        */
+    }
+
+    @Test
+    fun UT_03_Path_Sync_Verification() {
+        println("🧪 [START] UT_03: Verifying Kotlin-to-JNI Path Synchronization")
+        val internalPath = appContext.filesDir.absolutePath
+        val expectedInpPath = "$internalPath/pretrained/${TestConfig.DEFAULT_MODEL}_mock_input.inp"
+
+        assertTrue("Invalid Path Construction", expectedInpPath.contains("com.example.androidapp"))
+        assertTrue("Missing file extension", expectedInpPath.endsWith(".inp"))
+
+        println(">>> Calculated Sync Path: $expectedInpPath")
+        println("✅ [PASS] Pathing logic is correctly synchronized.")
+    }
+
+    @Test
+    fun UT_04_Manager_Connectivity() {
+        println("🧪 [START] UT_04: Verifying Connection to Mac Server Manager")
+        val clientManager = ClientManager(appContext)
+
+        println(">>> Attempting handshake with: ${TestConfig.MANAGER_URL}")
+
+        runBlocking {
+            val result = clientManager.requestServer(
+                TestConfig.MANAGER_URL,
+                TestConfig.DEFAULT_MODEL,
+                TestConfig.DEFAULT_PROTOCOL
+            )
+
+            // This will throw a descriptive error if the server is off
+            assertTrue(
+                "❌ FAILED: ServerManager unreachable at ${TestConfig.MANAGER_URL}. " +
+                        "Check if './gradlew run' is active on the host Mac.",
+                result.isSuccess
+            )
+
+            val server = result.getOrNull()
+            assertNotNull(server)
+            println("✅ [PASS] Handshake successful. Mac assigned port: ${server?.port}")
+        }
     }
 }

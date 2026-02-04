@@ -1,6 +1,5 @@
 package com.example.androidapp
 
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.text.SpannableStringBuilder
@@ -12,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
@@ -23,26 +23,23 @@ class MainActivity : AppCompatActivity() {
     private lateinit var etServerUrl: EditText
     private lateinit var btnConnectServer: Button
     private lateinit var btnRunClient: Button
-    private var currentServer: ServerResponse? = null
 
-    // Temporary storage for selected image URI
-    private var selectedImageUri: Uri? = null
+    private var currentServer: ServerResponse? = null
 
     // --- Image picker ---
     private val imagePicker =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             uri?.let { imageUri ->
-                selectedImageUri = imageUri
-                // Process image and create mock .inp file
+                // 1. Process image and create mock .inp file in the "pretrained" workspace
                 MockImageInputManager.processImage(
                     context = this,
                     imageUri = imageUri,
                     model = spModel.selectedItem.toString(),
                     protocol = spProtocol.selectedItem.toString()
                 ) { file ->
-                    appendLog("success", "Mock input file ready: ${file.name}")
-                    // Now run the client
-                    runMockClientAfterInputReady(file)
+                    appendLog("success", "✅ Image processed: ${file.name}")
+                    // 2. Run the native client now that input is ready
+                    runMockClientAfterInputReady()
                 }
             }
         }
@@ -50,10 +47,12 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        PretrainedFilesManager.copyPretrainedFiles(this)
+        // Ensure workspace directory exists for C++ I/O
+        File(filesDir, "pretrained").mkdirs()
 
         setContentView(R.layout.activity_main)
 
+        // Initialize Views
         clientManager = ClientManager(this)
         outputText = findViewById(R.id.tvResult)
         scrollView = findViewById(R.id.scrollOutput)
@@ -67,70 +66,67 @@ class MainActivity : AppCompatActivity() {
         btnRunClient.isEnabled = false
         btnRunClient.alpha = 0.4f
 
-        // --- Connect to server ---
+        // --- Connect to Server Manager ---
         btnConnectServer.setOnClickListener {
             lifecycleScope.launch {
                 resetLog()
                 val baseUrl = etServerUrl.text.toString().ifBlank { "http://10.0.2.2:8080" }
                 val model = spModel.selectedItem.toString()
                 val protocol = spProtocol.selectedItem.toString()
-                appendLog("info", "Requesting server...")
+
+                appendLog("info", "🛰️ Requesting server from Manager...")
 
                 val result = clientManager.requestServer(baseUrl, model, protocol)
                 result.onSuccess {
                     currentServer = it
-                    appendLog(
-                        "success",
-                        "Server returned IP: ${it.ip}, Port: ${it.port}, Model: ${it.model}, Protocol: ${it.protocol}"
-                    )
+                    appendLog("success", "✅ Server Ready: ${it.ip}:${it.port}")
                     btnRunClient.isEnabled = true
                     btnRunClient.alpha = 1f
                 }.onFailure {
-                    appendLog("error", "Connection failed: ${it.message}")
+                    appendLog("error", "❌ Connection failed: ${it.message}")
                     btnRunClient.isEnabled = false
                     btnRunClient.alpha = 0.4f
                 }
             }
         }
 
-        // --- Run mock client button ---
+        // --- Run Mock Client ---
         btnRunClient.setOnClickListener {
-            // Launch image picker first
             imagePicker.launch("image/*")
         }
     }
 
-    private fun runMockClientAfterInputReady(file: java.io.File) {
+    private fun runMockClientAfterInputReady() {
         val server = currentServer ?: run {
-            appendLog("error", "No server connected")
+            appendLog("error", "❌ No server connected")
             return
         }
 
         val model = spModel.selectedItem.toString()
         val protocol = spProtocol.selectedItem.toString()
 
-        appendLog("info", "Running mock client...")
+        appendLog("info", "🚀 Running Secure Inference...")
 
         lifecycleScope.launch {
+            // Using ClientManager wrapper which now handles the filesDir correctly
             val output = clientManager.runMockClient(protocol, model, server.ip, server.port)
-            appendLog("success", "Output:\n$output")
+            appendLog("success", output)
 
-            // Optional: parse last numbers as predicted class
             val predicted = clientManager.parseClientOutput(output)
-            appendLog("info", "Predicted class: $predicted")
+            appendLog("info", "📊 $predicted")
         }
     }
-
-    // --- Logging helpers ---
+    // --- Logging Helpers ---
     private fun resetLog() {
         outputText.text = ""
     }
 
     private fun appendLog(type: String, message: String) {
         val color = when (type) {
-            "success" -> 0xFF008000.toInt()
-            "error" -> 0xFFFF0000.toInt()
-            else -> 0xFF333333.toInt()
+            "success" -> 0xFF008000.toInt() // Green
+            "error" -> 0xFFFF0000.toInt()   // Red
+            "info" -> 0xFF0000FF.toInt()    // Blue
+            else -> 0xFF333333.toInt()      // Dark Gray
         }
         val spannable = SpannableStringBuilder(outputText.text)
         if (spannable.isNotEmpty()) spannable.append("\n")

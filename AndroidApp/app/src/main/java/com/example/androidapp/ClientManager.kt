@@ -1,12 +1,12 @@
 package com.example.androidapp
 
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import android.util.Log
 
 data class ServerResponse(
     val ip: String,
@@ -20,24 +20,24 @@ class ClientManager(private val context: Context) {
 
     private val client = OkHttpClient()
 
-    // --- Step 1: Query remote server for IP/port ---
+    /**
+     * Queries the Server Manager to start a C++ mock instance and return its connection info.
+     */
     suspend fun requestServer(
         baseUrl: String,
         model: String,
         protocol: String
     ): Result<ServerResponse> = withContext(Dispatchers.IO) {
         try {
-            val response = client.newCall(
-                Request.Builder()
-                    .url("$baseUrl/getServer?model=$model&protocol=$protocol")
-                    .build()
-            ).execute()
+            val url = "$baseUrl/getServer?model=$model&protocol=$protocol"
+            val response = client.newCall(Request.Builder().url(url).build()).execute()
 
-            if (!response.isSuccessful)
-                return@withContext Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}"))
+            }
 
-            val bodyString = response.body?.string() ?: return@withContext Result.failure(Exception("Empty response"))
-            val json = JSONObject(bodyString)
+            val body = response.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+            val json = JSONObject(body)
 
             Result.success(
                 ServerResponse(
@@ -53,40 +53,51 @@ class ClientManager(private val context: Context) {
         }
     }
 
-    // --- Step 2: Run JNI client ---
+    /**
+     * Executes the C++ client via JNI.
+     * Automatically passes the internal filesDir path to the native layer.
+     */
     suspend fun runMockClient(
-        protocol: String,   // cheetah | SCI_HE
-        model: String,      // resnet50 | sqnet etc.
+        protocol: String,
+        model: String,
         serverIp: String,
         serverPort: Int
-    ): String {
-        return try {
-            val result = NativeBridge.runMockClient(protocol, model, serverIp, serverPort)
-            Log.i("ClientManager", "Client output: $result")
+    ): String = withContext(Dispatchers.IO) {
+        return@withContext try {
+            // We get the absolute path of filesDir so the C++ code knows where to read .inp files
+            val internalPath = context.filesDir.absolutePath
+
+            val result = NativeBridge.runMockClient(
+                protocol,
+                model,
+                serverIp,
+                serverPort,
+                internalPath
+            )
+
+            Log.i("ClientManager", "Native output: $result")
             result
         } catch (e: Exception) {
-            Log.e("ClientManager", "Failed to run mock client", e)
+            Log.e("ClientManager", "JNI Execution failed", e)
             "Error: ${e.message}"
         }
     }
 
-
+    /**
+     * Parses the numeric shares returned by the C++ code to determine the result.
+     */
     fun parseClientOutput(output: String): String {
-        // Split output into lines
         val lines = output.lines()
-
-        // Take only the numeric lines at the end
+        // Extract lines that look like numbers
         val numericLines = lines
-            .filter { it.trim().matches(Regex("\\d+")) }
-            .map { it.trim().toInt() }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && it.all { char -> char.isDigit() } }
+            .map { it.toInt() }
 
-        if (numericLines.isEmpty()) return "No prediction"
+        if (numericLines.isEmpty()) return "Inference completed (No numeric shares found)"
 
-        // Argmax: find index of max value
+        // Standard ArgMax to find predicted class
         val predictedClass = numericLines.indices.maxByOrNull { numericLines[it] } ?: -1
-
-        return "Pain class $predictedClass"
+        return "Pain Class: $predictedClass"
     }
-
-
 }

@@ -9,50 +9,32 @@
 - Deterministic Inference: Mock computation using model weights and client input files.
 - Performance Scaling: Simulated computational overhead differences between OpenCheetah and SCI_HE, and between Full and Quantized models.
 
-.
-📂 Directory Layout
-<Text>
-PPNNI.Mock/
-├── mock_common.hpp      # Shared logic, networking helpers, and configuration
-├── mock_server.cpp      # Server-side binary source (The Orchestrated Model)
-├── mock_client.cpp      # Client-side binary source (JNI-compatible core)
-├── Makefile             # Automated build system with Catch2 integration
-├── pretrained/          # Mock weights and input shares (.inp files)
-│   ├── resnet50_mock_weights.inp
-│   ├── sqnet_mock_weights.inp
-│   └── mock_input.inp
-├── scripts/             # Orchestration and verification scripts
-│   ├── run-server.sh    # Script used by Kotlin Server Manager
-│   ├── run-client.sh    # Script for local client execution
-│   └── verify_matrix.sh # Automated 8-path combinatorial test
-└── tests/               # Professional Unit Test Suite
-    ├── test_main.cpp    # Catch2 test cases
-    └── catch.hpp        # Catch2 Unit Testing Framework (v2.x)
-</Text>
-
-
 
 ## 📂 Directory Layout
 <pre>
 PPNNI.Mock/
-├── mock_client.cpp
-├── mock_server.cpp
-├── mock_common.hpp
+├── mock_common.hpp      # Shared logic, networking helpers, and configuration
+├── mock_server.cpp      # Server-side binary source (The Orchestrated Model)
+├── mock_client.cpp      # Client-side binary source (JNI-compatible core)
 ├── pretrained/
 │   ├── resnet50_mock_weights.inp
 │   ├── resnet50_quantized_mock_weights.inp
 │   ├── sqnet_mock_weights.inp
 │   ├── sqnet_mock_quantized_weights.inp
 │   └── mock_input.inp --> test input
-├── scripts/
-│   ├── run-client.sh
-│   ├── run-server.sh
-│   └── common.sh
+├── scripts/             # Orchestration and verification scripts
+│   ├── run-server.sh    # Script used by Kotlin Server Manager
+│   ├── run-client.sh    # Script for local client execution
+│   └── verify_matrix.sh # Automated 8-path combinatorial test
+├── tests/               # Professional Unit Test Suite
+│   ├── test_main.cpp    # Catch2 test cases
+│   └── catch.hpp        # Catch2 Unit Testing Framework (v2.x)
 ├── build/
+│   ├── mock_server
 │   ├── mock_client
-│   └── mock_server
-├── Makefile
-└── README.MOCK.md
+│   └── unit_test
+├── Makefile             # Automated build system with Catch2 integration
+└── ReadMe.md
 
 </pre>
 

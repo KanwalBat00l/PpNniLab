@@ -57,7 +57,7 @@ AndroidApp/app/src/
 1. Run your backend (kotlin/ktor/C++ server) accessible via http request
 2. Build and install the Android app. 
 
-> ```bash 
+```bash 
  ./gradlew clean
 ./gradlew assembleDebug
 ./gradlew connectedAndroidTest

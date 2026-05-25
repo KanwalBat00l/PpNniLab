@@ -1,10 +1,13 @@
 plugins {
     kotlin("jvm") version "2.1.0"
     application
+    // Added these two for D6.2 requirements
+    id("com.gradleup.shadow") version "8.3.3" 
+    `maven-publish`
 }
 
-group = "com.example"
-version = "1.0-SNAPSHOT"
+group = "eu.licorice" // Updated for your project
+version = "1.0.0"     // Version tracking as requested by partners
 
 repositories {
     mavenCentral()
@@ -13,7 +16,7 @@ repositories {
 dependencies {
     val ktorVersion = "2.3.12"
     
-    // Core Ktor Libraries (No problematic plugins)
+    // Core Ktor Libraries
     implementation("io.ktor:ktor-server-core-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-netty-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")
@@ -36,10 +39,33 @@ application {
     mainClass.set("ServerAppKt")
 }
 
+// Configuration for uploading to Nexus
+publishing {
+    publications {
+        create<MavenPublication>("mavenJava") {
+            // This tells Gradle to upload the "Fat JAR" (the one with all dependencies)
+            artifact(tasks.named("shadowJar"))
+            groupId = "eu.licorice"
+            artifactId = "ppnni-server-manager"
+            version = "1.0.0"
+        }
+    }
+    repositories {
+        maven {
+            name = "Nexus"
+            url = uri("https://newregistry.evidenresearch.eu/repository/LICORICE-maven/")
+            credentials {
+                // We use project properties so we don't hardcode passwords here
+                username = project.findProperty("nexusUsername")?.toString() ?: ""
+                password = project.findProperty("nexusPassword")?.toString() ?: ""
+            }
+        }
+    }
+}
+
 tasks.test {
     useJUnitPlatform()
     testLogging {
-        // Detailed logging for EU verifiers
         events("passed", "skipped", "failed", "standardOut", "standardError")
         showStandardStreams = true
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
